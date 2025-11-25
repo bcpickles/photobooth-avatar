@@ -1742,71 +1742,79 @@ function createMinecraftCharacter(skinTexture) {
     // Character proportions (8x8x8 head, 8x12x4 body, 4x12x4 limbs)
     const scale = 1;
     
+    // Helper function to create a box with custom UVs
+    function createBox(width, height, depth, uvCoords) {
+        const geometry = new THREE.BoxGeometry(width, height, depth);
+        
+        // Get UV attribute
+        const uvAttribute = geometry.getAttribute('uv');
+        const uvArray = uvAttribute.array;
+        
+        // Each face has 2 triangles, each triangle has 3 vertices, each vertex has 2 UV coords
+        // Total: 6 faces * 2 triangles * 3 vertices * 2 coords = 72 values
+        
+        // Map our face UVs to the buffer
+        const faceUVs = uvCoords;
+        
+        for (let faceIndex = 0; faceIndex < 6; faceIndex++) {
+            const face = faceUVs[faceIndex];
+            // Each face has 4 UV coordinates, we need to map them to 6 vertices (2 triangles)
+            // Triangle 1: vertices 0, 1, 2
+            // Triangle 2: vertices 2, 3, 0 (but stored as 2, 1, 3)
+            
+            const baseIndex = faceIndex * 8; // 4 vertices * 2 coords per face
+            
+            // First triangle
+            uvArray[baseIndex + 0] = face[0].x;
+            uvArray[baseIndex + 1] = face[0].y;
+            uvArray[baseIndex + 2] = face[1].x;
+            uvArray[baseIndex + 3] = face[1].y;
+            
+            // Second triangle (shares vertices with first)
+            uvArray[baseIndex + 4] = face[2].x;
+            uvArray[baseIndex + 5] = face[2].y;
+            uvArray[baseIndex + 6] = face[3].x;
+            uvArray[baseIndex + 7] = face[3].y;
+        }
+        
+        uvAttribute.needsUpdate = true;
+        return geometry;
+    }
+    
     // Head
-    const headGeo = new THREE.BoxGeometry(8 * scale, 8 * scale, 8 * scale);
+    const headGeo = createBox(8 * scale, 8 * scale, 8 * scale, getHeadUVs());
     const head = new THREE.Mesh(headGeo, material);
     head.position.y = 10 * scale;
-    
-    // Apply UV mapping for head (front, back, right, left, top, bottom)
-    const headUVs = getHeadUVs();
-    headGeo.faceVertexUvs[0] = headUVs;
-    headGeo.uvsNeedUpdate = true;
-    
     group.add(head);
     
     // Body
-    const bodyGeo = new THREE.BoxGeometry(8 * scale, 12 * scale, 4 * scale);
+    const bodyGeo = createBox(8 * scale, 12 * scale, 4 * scale, getBodyUVs());
     const body = new THREE.Mesh(bodyGeo, material);
     body.position.y = 0;
-    
-    const bodyUVs = getBodyUVs();
-    bodyGeo.faceVertexUvs[0] = bodyUVs;
-    bodyGeo.uvsNeedUpdate = true;
-    
     group.add(body);
     
     // Right Arm
-    const armGeo = new THREE.BoxGeometry(4 * scale, 12 * scale, 4 * scale);
-    const rightArm = new THREE.Mesh(armGeo, material);
+    const rightArmGeo = createBox(4 * scale, 12 * scale, 4 * scale, getRightArmUVs());
+    const rightArm = new THREE.Mesh(rightArmGeo, material);
     rightArm.position.set(-6 * scale, 0, 0);
-    
-    const rightArmUVs = getRightArmUVs();
-    armGeo.faceVertexUvs[0] = rightArmUVs;
-    armGeo.uvsNeedUpdate = true;
-    
     group.add(rightArm);
     
     // Left Arm
-    const leftArmGeo = new THREE.BoxGeometry(4 * scale, 12 * scale, 4 * scale);
+    const leftArmGeo = createBox(4 * scale, 12 * scale, 4 * scale, getLeftArmUVs());
     const leftArm = new THREE.Mesh(leftArmGeo, material);
     leftArm.position.set(6 * scale, 0, 0);
-    
-    const leftArmUVs = getLeftArmUVs();
-    leftArmGeo.faceVertexUvs[0] = leftArmUVs;
-    leftArmGeo.uvsNeedUpdate = true;
-    
     group.add(leftArm);
     
     // Right Leg
-    const legGeo = new THREE.BoxGeometry(4 * scale, 12 * scale, 4 * scale);
-    const rightLeg = new THREE.Mesh(legGeo, material);
+    const rightLegGeo = createBox(4 * scale, 12 * scale, 4 * scale, getRightLegUVs());
+    const rightLeg = new THREE.Mesh(rightLegGeo, material);
     rightLeg.position.set(-2 * scale, -12 * scale, 0);
-    
-    const rightLegUVs = getRightLegUVs();
-    legGeo.faceVertexUvs[0] = rightLegUVs;
-    legGeo.uvsNeedUpdate = true;
-    
     group.add(rightLeg);
     
     // Left Leg
-    const leftLegGeo = new THREE.BoxGeometry(4 * scale, 12 * scale, 4 * scale);
+    const leftLegGeo = createBox(4 * scale, 12 * scale, 4 * scale, getLeftLegUVs());
     const leftLeg = new THREE.Mesh(leftLegGeo, material);
     leftLeg.position.set(2 * scale, -12 * scale, 0);
-    
-    const leftLegUVs = getLeftLegUVs();
-    leftLegGeo.faceVertexUvs[0] = leftLegUVs;
-    leftLegGeo.uvsNeedUpdate = true;
-    
     group.add(leftLeg);
     
     // Store body parts for animation
@@ -1826,18 +1834,18 @@ function createMinecraftCharacter(skinTexture) {
 function getHeadUVs() {
     const s = 64; // Texture size
     return [
-        // Right face
-        [uv(16/s, 8/s), uv(8/s, 8/s), uv(16/s, 0/s), uv(8/s, 0/s)],
-        // Left face
-        [uv(0/s, 8/s), uv(8/s, 8/s), uv(0/s, 0/s), uv(8/s, 0/s)],
-        // Top face
+        // Right face (+X)
+        [uv(16/s, 8/s), uv(8/s, 8/s), uv(16/s, 16/s), uv(8/s, 16/s)],
+        // Left face (-X)
+        [uv(0/s, 8/s), uv(8/s, 8/s), uv(0/s, 16/s), uv(8/s, 16/s)],
+        // Top face (+Y)
         [uv(8/s, 0/s), uv(16/s, 0/s), uv(8/s, 8/s), uv(16/s, 8/s)],
-        // Bottom face
+        // Bottom face (-Y)
         [uv(16/s, 0/s), uv(24/s, 0/s), uv(16/s, 8/s), uv(24/s, 8/s)],
-        // Front face
-        [uv(8/s, 16/s), uv(16/s, 16/s), uv(8/s, 8/s), uv(16/s, 8/s)],
-        // Back face
-        [uv(24/s, 16/s), uv(32/s, 16/s), uv(24/s, 8/s), uv(32/s, 8/s)]
+        // Front face (+Z)
+        [uv(8/s, 8/s), uv(16/s, 8/s), uv(8/s, 16/s), uv(16/s, 16/s)],
+        // Back face (-Z)
+        [uv(24/s, 8/s), uv(32/s, 8/s), uv(24/s, 16/s), uv(32/s, 16/s)]
     ];
 }
 
@@ -1845,65 +1853,65 @@ function getBodyUVs() {
     const s = 64;
     return [
         // Right
-        [uv(28/s, 20/s), uv(20/s, 20/s), uv(28/s, 8/s), uv(20/s, 8/s)],
+        [uv(28/s, 20/s), uv(20/s, 20/s), uv(28/s, 32/s), uv(20/s, 32/s)],
         // Left
-        [uv(16/s, 20/s), uv(20/s, 20/s), uv(16/s, 8/s), uv(20/s, 8/s)],
+        [uv(16/s, 20/s), uv(20/s, 20/s), uv(16/s, 32/s), uv(20/s, 32/s)],
         // Top
         [uv(20/s, 16/s), uv(28/s, 16/s), uv(20/s, 20/s), uv(28/s, 20/s)],
         // Bottom
         [uv(28/s, 16/s), uv(36/s, 16/s), uv(28/s, 20/s), uv(36/s, 20/s)],
         // Front
-        [uv(20/s, 32/s), uv(28/s, 32/s), uv(20/s, 20/s), uv(28/s, 20/s)],
+        [uv(20/s, 20/s), uv(28/s, 20/s), uv(20/s, 32/s), uv(28/s, 32/s)],
         // Back
-        [uv(32/s, 32/s), uv(40/s, 32/s), uv(32/s, 20/s), uv(40/s, 20/s)]
+        [uv(32/s, 20/s), uv(40/s, 20/s), uv(32/s, 32/s), uv(40/s, 32/s)]
     ];
 }
 
 function getRightArmUVs() {
     const s = 64;
     return [
-        [uv(44/s, 20/s), uv(40/s, 20/s), uv(44/s, 8/s), uv(40/s, 8/s)],
-        [uv(48/s, 20/s), uv(44/s, 20/s), uv(48/s, 8/s), uv(44/s, 8/s)],
+        [uv(44/s, 20/s), uv(40/s, 20/s), uv(44/s, 32/s), uv(40/s, 32/s)],
+        [uv(48/s, 20/s), uv(44/s, 20/s), uv(48/s, 32/s), uv(44/s, 32/s)],
         [uv(44/s, 16/s), uv(48/s, 16/s), uv(44/s, 20/s), uv(48/s, 20/s)],
         [uv(48/s, 16/s), uv(52/s, 16/s), uv(48/s, 20/s), uv(52/s, 20/s)],
-        [uv(44/s, 32/s), uv(48/s, 32/s), uv(44/s, 20/s), uv(48/s, 20/s)],
-        [uv(52/s, 32/s), uv(56/s, 32/s), uv(52/s, 20/s), uv(56/s, 20/s)]
+        [uv(44/s, 20/s), uv(48/s, 20/s), uv(44/s, 32/s), uv(48/s, 32/s)],
+        [uv(52/s, 20/s), uv(56/s, 20/s), uv(52/s, 32/s), uv(56/s, 32/s)]
     ];
 }
 
 function getLeftArmUVs() {
     const s = 64;
     return [
-        [uv(36/s, 52/s), uv(32/s, 52/s), uv(36/s, 40/s), uv(32/s, 40/s)],
-        [uv(40/s, 52/s), uv(36/s, 52/s), uv(40/s, 40/s), uv(36/s, 40/s)],
+        [uv(36/s, 52/s), uv(32/s, 52/s), uv(36/s, 64/s), uv(32/s, 64/s)],
+        [uv(40/s, 52/s), uv(36/s, 52/s), uv(40/s, 64/s), uv(36/s, 64/s)],
         [uv(36/s, 48/s), uv(40/s, 48/s), uv(36/s, 52/s), uv(40/s, 52/s)],
         [uv(40/s, 48/s), uv(44/s, 48/s), uv(40/s, 52/s), uv(44/s, 52/s)],
-        [uv(36/s, 64/s), uv(40/s, 64/s), uv(36/s, 52/s), uv(40/s, 52/s)],
-        [uv(44/s, 64/s), uv(48/s, 64/s), uv(44/s, 52/s), uv(48/s, 52/s)]
+        [uv(36/s, 52/s), uv(40/s, 52/s), uv(36/s, 64/s), uv(40/s, 64/s)],
+        [uv(44/s, 52/s), uv(48/s, 52/s), uv(44/s, 64/s), uv(48/s, 64/s)]
     ];
 }
 
 function getRightLegUVs() {
     const s = 64;
     return [
-        [uv(4/s, 20/s), uv(0/s, 20/s), uv(4/s, 8/s), uv(0/s, 8/s)],
-        [uv(8/s, 20/s), uv(4/s, 20/s), uv(8/s, 8/s), uv(4/s, 8/s)],
+        [uv(4/s, 20/s), uv(0/s, 20/s), uv(4/s, 32/s), uv(0/s, 32/s)],
+        [uv(8/s, 20/s), uv(4/s, 20/s), uv(8/s, 32/s), uv(4/s, 32/s)],
         [uv(4/s, 16/s), uv(8/s, 16/s), uv(4/s, 20/s), uv(8/s, 20/s)],
         [uv(8/s, 16/s), uv(12/s, 16/s), uv(8/s, 20/s), uv(12/s, 20/s)],
-        [uv(4/s, 32/s), uv(8/s, 32/s), uv(4/s, 20/s), uv(8/s, 20/s)],
-        [uv(12/s, 32/s), uv(16/s, 32/s), uv(12/s, 20/s), uv(16/s, 20/s)]
+        [uv(4/s, 20/s), uv(8/s, 20/s), uv(4/s, 32/s), uv(8/s, 32/s)],
+        [uv(12/s, 20/s), uv(16/s, 20/s), uv(12/s, 32/s), uv(16/s, 32/s)]
     ];
 }
 
 function getLeftLegUVs() {
     const s = 64;
     return [
-        [uv(20/s, 52/s), uv(16/s, 52/s), uv(20/s, 40/s), uv(16/s, 40/s)],
-        [uv(24/s, 52/s), uv(20/s, 52/s), uv(24/s, 40/s), uv(20/s, 40/s)],
+        [uv(20/s, 52/s), uv(16/s, 52/s), uv(20/s, 64/s), uv(16/s, 64/s)],
+        [uv(24/s, 52/s), uv(20/s, 52/s), uv(24/s, 64/s), uv(20/s, 64/s)],
         [uv(20/s, 48/s), uv(24/s, 48/s), uv(20/s, 52/s), uv(24/s, 52/s)],
         [uv(24/s, 48/s), uv(28/s, 48/s), uv(24/s, 52/s), uv(28/s, 52/s)],
-        [uv(20/s, 64/s), uv(24/s, 64/s), uv(20/s, 52/s), uv(24/s, 52/s)],
-        [uv(28/s, 64/s), uv(32/s, 64/s), uv(28/s, 52/s), uv(32/s, 52/s)]
+        [uv(20/s, 52/s), uv(24/s, 52/s), uv(20/s, 64/s), uv(24/s, 64/s)],
+        [uv(28/s, 52/s), uv(32/s, 52/s), uv(28/s, 64/s), uv(32/s, 64/s)]
     ];
 }
 
