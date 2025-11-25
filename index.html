@@ -1150,17 +1150,41 @@ const translations = {
 };
 
 // ===== INITIALIZATION =====
+// Wait for both DOM and external libraries to load
+let librariesLoaded = false;
+let domReady = false;
+
+function checkAndInit() {
+    if (librariesLoaded && domReady) {
+        console.log('🎮 Minecraft Photo Booth initializing...');
+        
+        initLanguageToggle();
+        initFileUpload();
+        initBackgroundSelector();
+        initAdjustControls();
+        initActionButtons();
+        initThreeJS();
+        
+        console.log('✅ Photo Booth ready!');
+    }
+}
+
+// Check if libraries are loaded
+window.addEventListener('load', () => {
+    if (typeof THREE !== 'undefined' && typeof JSZip !== 'undefined') {
+        console.log('✅ External libraries loaded');
+        librariesLoaded = true;
+        checkAndInit();
+    } else {
+        console.error('❌ External libraries failed to load');
+        alert('Error: Required libraries failed to load. Please check your internet connection and refresh the page.');
+    }
+});
+
 document.addEventListener('DOMContentLoaded', () => {
-    console.log('🎮 Minecraft Photo Booth initializing...');
-    
-    initLanguageToggle();
-    initFileUpload();
-    initBackgroundSelector();
-    initAdjustControls();
-    initActionButtons();
-    initThreeJS();
-    
-    console.log('✅ Photo Booth ready!');
+    console.log('✅ DOM ready');
+    domReady = true;
+    checkAndInit();
 });
 
 // ===== LANGUAGE SWITCHING =====
@@ -1195,18 +1219,28 @@ function switchLanguage(lang) {
 
 // ===== FILE UPLOAD HANDLING =====
 function initFileUpload() {
+    console.log('🔧 Initializing file upload...');
     const uploadZone = document.getElementById('upload-zone');
     const fileInput = document.getElementById('skin-file-input');
     const uploadStatus = document.getElementById('upload-status');
     
+    if (!uploadZone || !fileInput) {
+        console.error('❌ Upload elements not found!');
+        return;
+    }
+    
+    console.log('✅ Upload elements found');
+    
     // Click to upload
     uploadZone.addEventListener('click', () => {
+        console.log('👆 Upload zone clicked');
         fileInput.click();
     });
     
     // Keyboard support
     uploadZone.addEventListener('keydown', (e) => {
         if (e.key === 'Enter' || e.key === ' ') {
+            console.log('⌨️ Upload zone keyboard activated');
             e.preventDefault();
             fileInput.click();
         }
@@ -1214,9 +1248,13 @@ function initFileUpload() {
     
     // File selection
     fileInput.addEventListener('change', (e) => {
+        console.log('📂 File input changed');
         const file = e.target.files[0];
         if (file) {
+            console.log('📄 File selected:', file.name);
             handleFileUpload(file);
+        } else {
+            console.log('❌ No file selected');
         }
     });
     
@@ -1231,26 +1269,37 @@ function initFileUpload() {
     });
     
     uploadZone.addEventListener('drop', (e) => {
+        console.log('📥 File dropped');
         e.preventDefault();
         uploadZone.classList.remove('dragging');
         
         const file = e.dataTransfer.files[0];
         if (file) {
+            console.log('📄 Dropped file:', file.name);
             handleFileUpload(file);
+        } else {
+            console.log('❌ No file in drop event');
         }
     });
+    
+    console.log('✅ File upload initialized');
 }
 
 async function handleFileUpload(file) {
     console.log('📁 Processing file:', file.name);
+    console.log('📊 File type:', file.type);
+    console.log('📊 File size:', file.size, 'bytes');
     
     const uploadStatus = document.getElementById('upload-status');
-    const validTypes = ['image/png', 'application/octet-stream'];
+    const validTypes = ['image/png', 'application/octet-stream', 'application/zip'];
     const validExtensions = ['.png', '.mcpack'];
     
     // Check file type
     const fileExtension = file.name.toLowerCase().slice(file.name.lastIndexOf('.'));
+    console.log('📊 File extension:', fileExtension);
+    
     if (!validTypes.includes(file.type) && !validExtensions.includes(fileExtension)) {
+        console.error('❌ Invalid file type');
         showUploadStatus('error', translations[state.currentLanguage].skinLoadedError);
         return;
     }
@@ -1259,14 +1308,17 @@ async function handleFileUpload(file) {
         let skinImageData;
         
         if (fileExtension === '.mcpack') {
+            console.log('🗜️ Extracting MCPACK file...');
             // Handle MCPACK file
             skinImageData = await extractSkinFromMCPACK(file);
         } else {
+            console.log('🖼️ Loading PNG file...');
             // Handle PNG file
             skinImageData = await loadPNGFile(file);
         }
         
         if (skinImageData) {
+            console.log('✅ Image data loaded:', skinImageData.width + 'x' + skinImageData.height);
             state.skinTexture = skinImageData;
             state.skinLoaded = true;
             
@@ -1284,40 +1336,64 @@ async function handleFileUpload(file) {
             enableStep(2);
             
             console.log('✅ Skin loaded successfully');
+        } else {
+            console.error('❌ No image data returned');
+            showUploadStatus('error', translations[state.currentLanguage].skinLoadedError);
         }
     } catch (error) {
         console.error('❌ Error loading skin:', error);
-        showUploadStatus('error', translations[state.currentLanguage].skinLoadedError);
+        console.error('Error details:', error.message);
+        console.error('Error stack:', error.stack);
+        showUploadStatus('error', translations[state.currentLanguage].skinLoadedError + ' - ' + error.message);
     }
 }
 
 function loadPNGFile(file) {
+    console.log('🔄 Starting PNG file load...');
     return new Promise((resolve, reject) => {
         const reader = new FileReader();
         
         reader.onload = (e) => {
+            console.log('✅ FileReader loaded successfully');
             const img = new Image();
+            
             img.onload = () => {
+                console.log('✅ Image loaded:', img.width + 'x' + img.height);
                 // Validate skin dimensions (64x32 or 64x64)
                 if ((img.width === 64 && img.height === 32) || 
                     (img.width === 64 && img.height === 64)) {
+                    console.log('✅ Valid skin dimensions');
                     resolve(img);
                 } else {
-                    reject(new Error('Invalid skin dimensions. Must be 64x32 or 64x64.'));
+                    console.error('❌ Invalid dimensions:', img.width, 'x', img.height);
+                    reject(new Error(`Invalid skin dimensions (${img.width}x${img.height}). Must be 64x32 or 64x64.`));
                 }
             };
-            img.onerror = () => reject(new Error('Failed to load image'));
+            
+            img.onerror = (err) => {
+                console.error('❌ Image load error:', err);
+                reject(new Error('Failed to load image'));
+            };
+            
             img.src = e.target.result;
+            console.log('🔄 Image src set, waiting for load...');
         };
         
-        reader.onerror = () => reject(new Error('Failed to read file'));
+        reader.onerror = (err) => {
+            console.error('❌ FileReader error:', err);
+            reject(new Error('Failed to read file'));
+        };
+        
+        console.log('🔄 Starting FileReader...');
         reader.readAsDataURL(file);
     });
 }
 
 async function extractSkinFromMCPACK(file) {
     try {
+        console.log('🗜️ Loading MCPACK with JSZip...');
         const zip = await JSZip.loadAsync(file);
+        console.log('✅ MCPACK loaded, files:', Object.keys(zip.files));
         
         // Look for skin file (commonly in skins/ folder)
         let skinFile = null;
@@ -1329,8 +1405,10 @@ async function extractSkinFromMCPACK(file) {
             'skins/0.png'
         ];
         
+        console.log('🔍 Searching for skin in common paths...');
         for (const path of possiblePaths) {
             if (zip.files[path]) {
+                console.log('✅ Found skin at:', path);
                 skinFile = zip.files[path];
                 break;
             }
@@ -1338,9 +1416,11 @@ async function extractSkinFromMCPACK(file) {
         
         // If not found in common paths, search all PNG files
         if (!skinFile) {
+            console.log('🔍 Searching for any PNG file...');
             for (const filename in zip.files) {
                 if (filename.toLowerCase().endsWith('.png') && 
                     !zip.files[filename].dir) {
+                    console.log('✅ Found PNG file:', filename);
                     skinFile = zip.files[filename];
                     break;
                 }
@@ -1348,16 +1428,22 @@ async function extractSkinFromMCPACK(file) {
         }
         
         if (!skinFile) {
+            console.error('❌ No skin file found in MCPACK');
             throw new Error('No skin file found in MCPACK');
         }
         
         // Extract and load the image
+        console.log('🔄 Extracting skin file...');
         const blob = await skinFile.async('blob');
-        const file = new File([blob], 'skin.png', { type: 'image/png' });
+        console.log('✅ Blob created:', blob.size, 'bytes');
         
-        return await loadPNGFile(file);
+        const extractedFile = new File([blob], 'skin.png', { type: 'image/png' });
+        console.log('🔄 Loading extracted PNG...');
+        
+        return await loadPNGFile(extractedFile);
     } catch (error) {
-        console.error('Error extracting MCPACK:', error);
+        console.error('❌ Error extracting MCPACK:', error);
+        console.error('Error message:', error.message);
         throw error;
     }
 }
